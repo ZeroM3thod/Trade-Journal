@@ -137,6 +137,10 @@ input,select,textarea{font-family:var(--font-main)}
 .info-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text2);padding:2px 0}
 .info-val{color:var(--text);font-weight:500}
 
+/* ── Wheel Picker ── */
+.wheel-scroll::-webkit-scrollbar{display:none}
+.wheel-scroll{-ms-overflow-style:none;scrollbar-width:none}
+
 /* ── Mobile sidebar drawer ── */
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:150;backdrop-filter:blur(1px)}
 .sidebar-overlay.open{display:block}
