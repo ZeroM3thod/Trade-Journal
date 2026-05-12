@@ -1,9 +1,15 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_MISSING } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
+
+const guard = () =>
+  !supabase
+    ? NextResponse.json({ error: SUPABASE_MISSING }, { status: 503 })
+    : null;
 
 // GET /api/trades            — returns ALL trades (for stats)
 // GET /api/trades?year=2025&month=5  — returns trades for that month
 export async function GET(request) {
+  const err = guard(); if (err) return err;
   const { searchParams } = new URL(request.url);
   const year  = searchParams.get('year');
   const month = searchParams.get('month');
@@ -27,6 +33,8 @@ export async function GET(request) {
 
 // POST /api/trades  — upsert (insert or update by date)
 export async function POST(request) {
+  const err = guard(); if (err) return err;
+
   const body = await request.json();
   const { date, traded, pnl, amount, note } = body;
 
@@ -53,6 +61,8 @@ export async function POST(request) {
 
 // DELETE /api/trades?date=2025-05-12
 export async function DELETE(request) {
+  const err = guard(); if (err) return err;
+
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
   if (!date) return NextResponse.json({ error: 'date is required' }, { status: 400 });
