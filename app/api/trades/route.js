@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 
-// GET /api/trades?year=2025&month=5
+// GET /api/trades            — returns ALL trades (for stats)
+// GET /api/trades?year=2025&month=5  — returns trades for that month
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const year  = searchParams.get('year');
@@ -10,9 +11,12 @@ export async function GET(request) {
   let query = supabase.from('trades').select('*').order('date');
 
   if (year && month) {
-    const from = `${year}-${String(month).padStart(2,'0')}-01`;
-    // last day of month
-    const to   = `${year}-${String(month).padStart(2,'0')}-31`;
+    const y = String(year);
+    const m = String(month).padStart(2, '0');
+    const from = `${y}-${m}-01`;
+    // Use the actual last day of the month instead of hardcoded 31
+    const lastDay = new Date(Number(year), Number(month), 0).getDate();
+    const to = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
     query = query.gte('date', from).lte('date', to);
   }
 
@@ -30,8 +34,16 @@ export async function POST(request) {
 
   const { data, error } = await supabase
     .from('trades')
-    .upsert({ date, traded, pnl: traded ? pnl : null, amount: traded ? amount : 0, note: traded ? note : null },
-            { onConflict: 'date' })
+    .upsert(
+      {
+        date,
+        traded,
+        pnl:    traded ? pnl    : null,
+        amount: traded ? amount : 0,
+        note:   traded ? note   : null,
+      },
+      { onConflict: 'date' }
+    )
     .select()
     .single();
 

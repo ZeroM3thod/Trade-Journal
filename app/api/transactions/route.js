@@ -1,44 +1,96 @@
-import { supabase } from '@/lib/supabase';
-import { NextResponse } from 'next/server';
+'use client';
+import { useState } from 'react';
+import { useJournal } from '@/hooks/useJournal';
+import Topbar        from '@/components/Topbar';
+import Sidebar       from '@/components/Sidebar';
+import Calendar      from '@/components/Calendar';
+import TradeDialog   from '@/components/TradeDialog';
+import DepositDialog from '@/components/DepositDialog';
 
-// GET /api/transactions   — returns ALL transactions (for sidebar stats)
-export async function GET() {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .order('date')
-    .order('created_at');
+export default function HomePage() {
+  const journal = useJournal();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
-}
+  const [tradeDate,  setTradeDate]  = useState(null);
+  const [depType,    setDepType]    = useState(null);
+  const [mobSidebar, setMobSidebar] = useState(false);
 
-// POST /api/transactions  — create a deposit or withdrawal
-export async function POST(request) {
-  const body = await request.json();
-  const { date, type, amount, time, note } = body;
+  const openTradeDialog  = (d) => setTradeDate(d);
+  const closeTradeDialog = ()  => setTradeDate(null);
+  const openDepDialog    = (t) => setDepType(t);
+  const closeDepDialog   = ()  => setDepType(null);
 
-  if (!date || !type || !amount) {
-    return NextResponse.json({ error: 'date, type, amount are required' }, { status: 400 });
+  if (journal.loading) {
+    return <div className="loading-overlay">Loading your journal…</div>;
   }
 
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert({ date, type, amount, time: time || null, note: note || null })
-    .select()
-    .single();
+  return (
+    <div className="app">
+      {/* ── Supabase error banner ── */}
+      {journal.error && (
+        <div style={{
+          background: 'rgba(242,139,130,0.15)',
+          border: '1px solid rgba(242,139,130,0.4)',
+          color: '#f28b82',
+          padding: '10px 16px',
+          fontSize: 13,
+          flexShrink: 0,
+        }}>
+          ⚠️ <strong>Connection error:</strong> {journal.error}
+          &nbsp;— Check your <code>.env.local</code> Supabase credentials, make sure the
+          schema SQL has been run, and that Row Level Security (RLS) is disabled or has
+          permissive policies on the <code>trades</code> and <code>transactions</code> tables.
+        </div>
+      )}
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
-}
+      {mobSidebar && (
+        <div className="sidebar-overlay open" onClick={() => setMobSidebar(false)}/>
+      )}
 
-// DELETE /api/transactions?id=42
-export async function DELETE(request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+      <Topbar
+        cur={journal.cur}
+        onPrev={() => journal.goMonth(-1)}
+        onNext={() => journal.goMonth(+1)}
+        onToday={journal.goToday}
+        onOpenDeposit={openDepDialog}
+        onMobMenu={() => setMobSidebar(true)}
+      />
 
-  const { error } = await supabase.from('transactions').delete().eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+      <div className="body">
+        <Sidebar
+          stats={journal.stats}
+          sortedTxns={journal.sortedTxns}
+          onOpenDeposit={(type) => { openDepDialog(type); setMobSidebar(false); }}
+          mobOpen={mobSidebar}
+        />
+
+        <Calendar
+          cur={journal.cur}
+          today={journal.today}
+          trades={journal.trades}
+          txnsByDate={journal.txnsByDate}
+          onDayClick={openTradeDialog}
+        />
+      </div>
+
+      {tradeDate && (
+        <TradeDialog
+          date={tradeDate}
+          existing={journal.trades[
+            `${tradeDate.getFullYear()}-${String(tradeDate.getMonth()+1).padStart(2,'0')}-${String(tradeDate.getDate()).padStart(2,'0')}`
+          ]}
+          onSave={journal.saveTrade}
+          onDelete={journal.deleteTrade}
+          onClose={closeTradeDialog}
+        />
+      )}
+
+      {depType && (
+        <DepositDialog
+          initialType={depType}
+          onSave={journal.saveTransaction}
+          onClose={closeDepDialog}
+        />
+      )}
+    </div>
+  );
 }
